@@ -1,0 +1,4 @@
+# 테스트 참가자 repo. 생태계와 상관없이 표본에 넣는다.
+#   user:NAME     그 사람의 repo 전부 (fork 제외)
+#   owner/repo    repo 하나
+user:andy6609
