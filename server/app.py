@@ -10,8 +10,8 @@
 실행: .venv/bin/uvicorn server.app:app --port 8787   (GITHUB_TOKEN이 있으면 들이기가 넉넉해진다)
 """
 import json
+import math
 import re
-import sqlite3
 import threading
 import time
 from pathlib import Path
@@ -23,6 +23,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from server import ingest as I
+from server.database import connect
 
 ROOT = Path(__file__).resolve().parent.parent
 DB_PATH = ROOT / "data/universe.db"
@@ -37,19 +38,18 @@ _ingest_lock = threading.Lock()
 _failed = {}  # login → (시각, 이유). 같은 실패를 계속 GitHub에 묻지 않는다
 
 
-def db():
-    con = sqlite3.connect(DB_PATH, check_same_thread=False)
-    con.row_factory = sqlite3.Row
-    return con
-
-
-CON = db()
+CON = connect(DB_PATH)
 MODEL = I.U.Model.load(ROOT / "data/model")
 
 
 def orbits_by_account():
     """계정마다 궤도 수 (가장 바깥 궤도 번호 + 1). 궤도 하나에 행성 하나 (DIRECTION D19)"""
-    return {row[0]: row[1] + 1 for row in CON.execute("SELECT account, MAX(ring) FROM repos WHERE visible = 1 GROUP BY account")}
+    return {
+        row["account"]: row["max_ring"] + 1
+        for row in CON.execute(
+            "SELECT account, MAX(ring) AS max_ring FROM repos WHERE visible = 1 GROUP BY account"
+        )
+    }
 
 
 def system_row(a, orbits):
@@ -85,16 +85,16 @@ def world():
         regions = [{"id": r["id"], "gal": r["galaxy"], "name": r["name"], "c": [r["cx"], r["cy"], r["cz"]], "r": r["radius"]}
                    for r in CON.execute("SELECT * FROM regions ORDER BY id")]
         orbits = orbits_by_account()
-        accounts = list(CON.execute("SELECT * FROM accounts ORDER BY rowid"))
+        accounts = list(CON.execute("SELECT * FROM accounts ORDER BY placed_at, id"))
         systems = [system_row(a, orbits.get(a["id"], 0)) for a in accounts]
         sys_index = {a["id"]: k for k, a in enumerate(accounts)}
-        repos = list(CON.execute("SELECT id, account, name, ring, x, y, z, lang, created, stars FROM repos WHERE visible = 1 ORDER BY rowid"))
-        edges = CON.execute("SELECT COUNT(*) FROM edges").fetchone()[0]
+        repos = list(CON.execute("SELECT id, account, name, ring, x, y, z, lang, created, stars FROM repos WHERE visible = 1 ORDER BY placed_at, id"))
+        edges = CON.execute("SELECT COUNT(*) AS n FROM edges").fetchone()["n"]
     for s, a in zip(systems, accounts):
         s["n"] = 0
     for r in repos:
         systems[sys_index[r["account"]]]["n"] += 1
-    extent = max((np.hypot(s["c"][0], s["c"][2]) for s in systems), default=1000)
+    extent = max((math.hypot(s["c"][0], s["c"][2]) for s in systems), default=1000)
     return {
         "meta": {
             "placement_version": int(meta.get("placement_version", 0)),
@@ -179,14 +179,17 @@ def suggest(q: str = Query(..., min_length=2, max_length=100)):
                 for r in CON.execute("SELECT login FROM accounts WHERE login LIKE ? ORDER BY length(login) LIMIT 3", (n + "%",))]
         like = f"%/{n}%" if "/" not in n else f"{n}%"
         repos = [{"label": r["name"], "value": r["name"], "sub": r["desc"] or ""}
-                 for r in CON.execute("SELECT name, desc FROM repos WHERE name LIKE ? AND visible = 1 ORDER BY length(name) LIMIT 6", (like,))]
+                 for r in CON.execute('SELECT name, "desc" AS "desc" FROM repos WHERE name LIKE ? AND visible = 1 ORDER BY length(name) LIMIT 6', (like,))]
     return (accs + repos)[:6]
 
 
 def ingest_index():
     """배치 모델과 같은 공간의 계정 벡터·중심·반지름"""
     rows = list(CON.execute("SELECT id, galaxy, region, cx, cy, cz, vec FROM accounts"))
-    counts = dict(CON.execute("SELECT account, COUNT(*) FROM repos GROUP BY account").fetchall())
+    counts = {
+        row["account"]: row["n"]
+        for row in CON.execute("SELECT account, COUNT(*) AS n FROM repos GROUP BY account")
+    }
     gal_rows = list(CON.execute("SELECT id, nx, ny, nz, cx, cy, cz, radius FROM galaxies"))
     gal = {g["id"]: np.array([g["nx"], g["ny"], g["nz"]]) for g in gal_rows}
     weak = CON.execute("SELECT v FROM meta WHERE k = 'weak_similarity'").fetchone()
@@ -227,14 +230,13 @@ def ingest(login: str):
             known = {r["name"].lower(): r["id"] for r in CON.execute("SELECT id, name FROM repos")}
             dup = CON.execute("SELECT id FROM accounts WHERE id = ?", (acc["id"],)).fetchone()
         if dup:  # 이름이 바뀐 계정
-            with _db_lock:
+            with _db_lock, CON.transaction():
                 CON.execute("UPDATE accounts SET login = ? WHERE id = ?", (acc["login"], acc["id"]))
-                CON.commit()
             return {"status": "exists", "id": acc["id"]}
         taken = set(known.values())
         repos = [r for r in acc["repos"] if r["id"] not in taken]
         edges = I.enrich(repos, known)
-        with _db_lock:
+        with _db_lock, CON.transaction():
             placed = I.place(MODEL, acc, repos, known, ingest_index())
             CON.execute("INSERT INTO accounts VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (
                 acc["id"], acc["login"], acc["kind"], acc.get("name"), placed["galaxy"], placed["region"],
@@ -242,17 +244,16 @@ def ingest(login: str):
                 I.U.PLACEMENT_VERSION, "search", placed["vector"].astype(np.float32).tobytes(),
             ))
             for r, ring, ang, xyz in placed["planets"]:
-                CON.execute("INSERT OR IGNORE INTO repos VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (
+                CON.execute("INSERT INTO repos VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT DO NOTHING", (
                     r["id"], acc["id"], r["name"], r.get("desc"), json.dumps(r.get("topics") or []), r.get("lang"),
                     r.get("stars"), int(bool(r.get("archived"))), r.get("created"), r.get("pushed"), r.get("license"),
                     r.get("observed"), r.get("src"), json.dumps(r.get("packages") or []), ring, ang, *xyz, I.U.today(), 1,
                 ))
                 for p in r.get("packages") or []:
-                    CON.execute("INSERT OR IGNORE INTO packages VALUES (?,?,?)", (p["eco"], p["name"], r["id"]))
-            CON.executemany("INSERT OR IGNORE INTO edges VALUES (?,?,?,?)", edges)
-            CON.commit()
+                    CON.execute("INSERT INTO packages VALUES (?,?,?) ON CONFLICT DO NOTHING", (p["eco"], p["name"], r["id"]))
+            CON.executemany("INSERT INTO edges VALUES (?,?,?,?) ON CONFLICT DO NOTHING", edges)
             a = CON.execute("SELECT * FROM accounts WHERE id = ?", (acc["id"],)).fetchone()
-            rows = list(CON.execute("SELECT id, account, name, ring, x, y, z, lang, created, stars FROM repos WHERE account = ? ORDER BY rowid", (acc["id"],)))
+            rows = list(CON.execute("SELECT id, account, name, ring, x, y, z, lang, created, stars FROM repos WHERE account = ? ORDER BY placed_at, id", (acc["id"],)))
         s = system_row(a, max((r["ring"] for r in rows), default=-1) + 1)
         s["n"] = len(rows)
         return {

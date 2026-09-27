@@ -3,6 +3,10 @@ __pycache__/
 node_modules/
 dist/
 .DS_Store
+.env
+.env.*
+!.env.example
+.vercel/
 
 # API 캐시와 중간 산출물. 좌표 장부(data/universe.db)와 고정 모델(data/model/)은 버전 관리한다.
 # data/ledger.json은 배치 v1–v3의 장부 (기록으로 남긴다).
