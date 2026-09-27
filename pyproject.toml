@@ -5,7 +5,7 @@ requires-python = ">=3.12,<3.13"
 dynamic = ["dependencies"]
 
 [tool.vercel]
-entrypoint = "app.py"
+entrypoint = "app:app"
 
 [tool.vercel.scripts]
 build = "npm --prefix web ci && npm --prefix web run build"
