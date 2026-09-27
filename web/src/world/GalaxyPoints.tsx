@@ -15,6 +15,7 @@ attribute float aHalo;
 attribute vec3 aColor;
 attribute float aSys;
 uniform float uFocusSys;
+uniform float uDioramaSys;
 uniform float uScale;
 uniform float uDpr;
 uniform float uMinPx;
@@ -33,7 +34,8 @@ void main() {
   float galaxyScale = smoothstep(400.0 * uUnit, 2000.0 * uUnit, dist);
   // 보고 있는 행성계의 행성은 궤도가 촘촘해도 점으로 또렷하게 (자리는 그대로, 크기·밝기만)
   float mine = abs(aSys - uFocusSys) < 0.5 ? 1.0 : 0.0;
-  vAlpha = (1.0 - sphere) * mix(mix(0.62, 1.0, aHalo - 1.0) * far * mix(1.0, 0.22, galaxyScale), 1.0, mine);
+  float inDiorama = abs(aSys - uDioramaSys) < 0.5 ? 1.0 : 0.0;
+  vAlpha = (1.0 - inDiorama) * (1.0 - sphere) * mix(mix(0.62, 1.0, aHalo - 1.0) * far * mix(1.0, 0.22, galaxyScale), 1.0, mine);
   vColor = aColor;
   float minPx = mix(uMinPx * aHalo * mix(1.0, 0.7, galaxyScale), 4.5 * aHalo, mine);
   gl_PointSize = max(minPx, diam * 1.2) * uDpr;
@@ -112,7 +114,14 @@ export function GalaxyPoints({ world }: { world: World }) {
       vertexShader: pointVS,
       fragmentShader: pointFS,
       // 우주 크기에 맞춰 먼 광점이 흐려진다 (가장 먼 은하까지 보이게)
-      uniforms: { ...shared, uMinPx: { value: 2.0 }, uFar: { value: world.meta.stats.radius * 5 }, uUnit: { value: world.scale }, uFocusSys: { value: -1 } },
+      uniforms: {
+        ...shared,
+        uMinPx: { value: 2.0 },
+        uFar: { value: world.meta.stats.radius * 5 },
+        uUnit: { value: world.scale },
+        uFocusSys: { value: -1 },
+        uDioramaSys: { value: -1 },
+      },
       transparent: true,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
@@ -141,6 +150,7 @@ export function GalaxyPoints({ world }: { world: World }) {
     u.uDpr.value = gl.getPixelRatio()
     const { focus, system } = useStore.getState()
     u.uFocusSys.value = focus !== null ? (world.planets[focus]?.sys ?? -1) : (system ?? -1)
+    u.uDioramaSys.value = focus === null ? (system ?? -1) : -1
   })
 
   return (

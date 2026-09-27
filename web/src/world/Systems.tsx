@@ -11,14 +11,21 @@ import { rt } from './runtime'
 
 const starVS = /* glsl */ `
 attribute float aCore;
+attribute float aSys;
 attribute vec3 aTint;
 varying vec3 vTint;
 uniform float uScale;
 uniform float uDpr;
 uniform float uUnit;
+uniform float uDioramaSys;
 varying float vCore;
 varying float vAlpha;
 void main() {
+  if (abs(aSys - uDioramaSys) < 0.5) {
+    gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+    gl_PointSize = 0.0;
+    return;
+  }
   vec4 mv = modelViewMatrix * vec4(position, 1.0);
   float dist = max(-mv.z, 0.001);
   float galaxyScale = smoothstep(500.0 * uUnit, 2400.0 * uUnit, dist);
@@ -56,6 +63,7 @@ attribute float iSys;
 uniform float uR0;
 uniform float uGap;
 uniform float uFocusSys;
+uniform float uDioramaSys;
 uniform float uOthers;
 uniform float uScale;
 varying vec2 vLocal;
@@ -64,6 +72,11 @@ varying float vMine;
 varying float vAlpha;
 void main() {
   float mine = abs(iSys - uFocusSys) < 0.5 ? 1.0 : 0.0;
+  if (abs(iSys - uDioramaSys) < 0.5) {
+    vAlpha = 0.0;
+    gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+    return;
+  }
   float d = length((modelViewMatrix * vec4(iCenter, 1.0)).xyz);
   // 다른 행성계의 궤도는 궤도 간격이 화면에서 몇 px은 될 만큼 가까울 때만
   float gapPx = uGap * uScale / max(d, 0.001);
@@ -129,21 +142,29 @@ export function Systems({ world }: { world: World }) {
     const n = world.systems.length
     const pos = new Float32Array(n * 3)
     const core = new Float32Array(n)
+    const sysIndex = new Float32Array(n)
     const tint = new Float32Array(n * 3)
     world.systems.forEach((s, k) => {
       pos.set(s.c, k * 3)
       core[k] = starCore(s.n)
+      sysIndex[k] = k
       const c = starTint(s.id)
       tint.set([c.r, c.g, c.b], k * 3)
     })
     const sg = new THREE.BufferGeometry()
     sg.setAttribute('position', new THREE.BufferAttribute(pos, 3))
     sg.setAttribute('aCore', new THREE.BufferAttribute(core, 1))
+    sg.setAttribute('aSys', new THREE.BufferAttribute(sysIndex, 1))
     sg.setAttribute('aTint', new THREE.BufferAttribute(tint, 3))
     const sm = new THREE.ShaderMaterial({
       vertexShader: starVS,
       fragmentShader: starFS,
-      uniforms: { uScale: { value: 1 }, uDpr: { value: 1 }, uUnit: { value: world.scale } },
+      uniforms: {
+        uScale: { value: 1 },
+        uDpr: { value: 1 },
+        uUnit: { value: world.scale },
+        uDioramaSys: { value: -1 },
+      },
       transparent: true,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
@@ -185,6 +206,7 @@ export function Systems({ world }: { world: World }) {
         uR0: { value: world.meta.orbit.r0 },
         uGap: { value: world.meta.orbit.gap },
         uFocusSys: { value: -1 },
+        uDioramaSys: { value: -1 },
         uFocusRing: { value: -1 },
         uOthers: { value: 0.16 },
         uScale: { value: 1 },
@@ -204,11 +226,13 @@ export function Systems({ world }: { world: World }) {
     su.uScale.value = rt.pxScale
     su.uDpr.value = gl.getPixelRatio()
     const ou = (orbits.material as THREE.ShaderMaterial).uniforms
+    su.uDioramaSys.value = focus === null ? (system ?? -1) : -1
     ou.uFocusSys.value = focus !== null ? (world.planets[focus]?.sys ?? -1) : (system ?? rt.hoverStar)
+    ou.uDioramaSys.value = focus === null ? (system ?? -1) : -1
     ou.uFocusRing.value = focus !== null ? (world.planets[focus]?.ring ?? -1) : -1
     ou.uScale.value = rt.pxScale
     // 행성에 도착해 있으면 다른 행성계의 궤도는 지운다 (그 행성의 행성계만 남긴다)
-    const want = phase === 'orbit' ? 0 : 0.12
+    const want = phase === 'orbit' || system !== null ? 0 : 0.12
     ou.uOthers.value += (want - ou.uOthers.value) * (1 - Math.exp(-dt * 3))
   })
 

@@ -101,6 +101,14 @@ await waitPhase('survey', 20000).catch(() => {})
 await sleep(1500)
 await page.screenshot({ path: `${OUT}/7-owner.png` })
 
+// 낮은 시점에서도 디오라마가 2D 원판처럼 보이지 않는지 확인한다 (D21).
+await page.mouse.move(720, 520)
+await page.mouse.down()
+for (let k = 0; k < 12; k++) await page.mouse.move(720, 520 - k * 7)
+await page.mouse.up()
+await sleep(700)
+await page.screenshot({ path: `${OUT}/7-owner-low-angle.png` })
+
 // 갤러리
 await page.goto(`${BASE}/?view=gallery&seed=${process.env.SEED ?? 1}`, { waitUntil: 'networkidle0' })
 await sleep(2500)

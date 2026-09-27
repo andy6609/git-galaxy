@@ -13,6 +13,8 @@ export const rt = {
   hoverStar: -1,
   /** 이번 프레임에 구체로 그려지는 행성 (가까운 순) */
   visibleSpheres: [] as number[],
+  /** 계정 디오라마의 아주 느린 공전 시간. reduced motion이면 증가하지 않는다. */
+  portraitTime: 0,
   /** 화면 높이 기준 투영 배율: 거리 d에서 크기 s인 물체의 화면 크기 = s * scale / d */
   pxScale: 1,
   /** 라벨·링을 그리는 DOM 레이어. Overlay가 등록한다 */

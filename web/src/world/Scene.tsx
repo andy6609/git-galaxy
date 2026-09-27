@@ -3,7 +3,7 @@ import { useEffect } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { World } from '../data'
-import { goToPlanet, openFromUrl, showSystem } from '../nav'
+import { goToPlanet, openFromUrl, showGalaxy, showSystem } from '../nav'
 import { getState, setState } from '../store'
 import { Backdrop } from './Backdrop'
 import { GalaxyPoints } from './GalaxyPoints'
@@ -12,6 +12,8 @@ import { Planets } from './Planets'
 import { projector } from './project'
 import { rt } from './runtime'
 import { starCore, Systems } from './Systems'
+import { SystemDiorama } from './SystemDiorama'
+import { portraitLayout, portraitWorldPosition } from './systemPortrait'
 
 const HIT_PX = 10
 const out = new Float32Array(3)
@@ -39,19 +41,56 @@ function pick(world: World, cam: THREE.PerspectiveCamera, width: number, height:
 }
 
 /** 포인터 아래의 중심별 (행성이 없을 때만) */
-function pickStar(world: World, cam: THREE.PerspectiveCamera, width: number, height: number, at: { x: number; y: number }) {
+function pickStar(
+  world: World,
+  cam: THREE.PerspectiveCamera,
+  width: number,
+  height: number,
+  at: { x: number; y: number },
+  exclude = -1,
+  hitPx = 18,
+) {
   const pr = projector(cam, width, height)
   let best = -1
   let bestD = Infinity
   world.systems.forEach((s, k) => {
+    if (k === exclude) return
     if (!pr.project(s.c[0], s.c[1], s.c[2], out)) return
     const d = Math.hypot(out[0] - at.x, out[1] - at.y)
-    const reach = Math.max((2 * starCore(s.n) * rt.pxScale) / out[2] + 4, HIT_PX)
+    const reach = Math.max((2 * starCore(s.n) * rt.pxScale) / out[2] + 6, hitPx)
     if (d < reach && d < bestD) {
       bestD = d
       best = k
     }
   })
+  return best
+}
+
+/** 계정 초상의 큰 대표 행성은 배경 중심별보다 먼저 선택한다. */
+function pickPortrait(
+  world: World,
+  system: number,
+  cam: THREE.PerspectiveCamera,
+  width: number,
+  height: number,
+  at: { x: number; y: number },
+  hitPx = 18,
+) {
+  const pr = projector(cam, width, height)
+  let best = -1
+  let bestScore = Infinity
+  for (const hero of portraitLayout(world, system)) {
+    const [x, y, z] = portraitWorldPosition(world, system, hero, rt.portraitTime)
+    if (!pr.project(x, y, z, out)) continue
+    const distance = Math.hypot(out[0] - at.x, out[1] - at.y)
+    const projectedRadius = (hero.radius * 1.15 * rt.pxScale) / out[2]
+    if (distance > Math.max(projectedRadius + 10, hitPx)) continue
+    const score = distance - projectedRadius + out[2] * 0.0005
+    if (score < bestScore) {
+      bestScore = score
+      best = hero.index
+    }
+  }
   return best
 }
 
@@ -73,6 +112,14 @@ export function Scene({ world }: { world: World }) {
     const t = setTimeout(() => openFromUrl(world), 700)
     return () => clearTimeout(t)
   }, [camera, world])
+
+  useEffect(() => {
+    const restore = () => {
+      if (!openFromUrl(world)) showGalaxy(world)
+    }
+    window.addEventListener('popstate', restore)
+    return () => window.removeEventListener('popstate', restore)
+  }, [world])
 
   useEffect(() => {
     const el = gl.domElement
@@ -126,12 +173,24 @@ export function Scene({ world }: { world: World }) {
       if (press && press.moved < 6 && pointers.size === 0) {
         if (rt.rig.traveling) rt.rig.skip()
         else if (rt.camera) {
-          const near = rt.camera.position.distanceTo(rt.rig.look) < 1500 * world.scale
-          const i = near ? pick(world, rt.camera, size.width, size.height, p) : -1
-          if (i >= 0) goToPlanet(world, i, 'click')
-          else {
-            const k = pickStar(world, rt.camera, size.width, size.height, p)
-            if (k >= 0) showSystem(world, k, 'system')
+          const currentSystem = getState().system
+          const portrait = currentSystem !== null && getState().focus === null
+          if (portrait) {
+            const hit = e.pointerType === 'touch' ? 28 : 18
+            const i = pickPortrait(world, currentSystem, rt.camera, size.width, size.height, p, hit)
+            if (i >= 0) goToPlanet(world, i, 'click')
+            else {
+              const k = pickStar(world, rt.camera, size.width, size.height, p, currentSystem, hit)
+              if (k >= 0) showSystem(world, k, 'system')
+            }
+          } else {
+            const near = rt.camera.position.distanceTo(rt.rig.look) < 1500 * world.scale
+            const i = near ? pick(world, rt.camera, size.width, size.height, p) : -1
+            if (i >= 0) goToPlanet(world, i, 'click')
+            else {
+              const k = pickStar(world, rt.camera, size.width, size.height, p)
+              if (k >= 0) showSystem(world, k, 'system')
+            }
           }
         }
       }
@@ -195,11 +254,22 @@ export function Scene({ world }: { world: World }) {
     }
     cam.updateMatrixWorld()
     const canHover = rt.pointer && !rt.dragging && !rt.rig.traveling
+    const portrait = getState().system !== null && getState().focus === null
+    if (portrait && !rt.rig.reducedMotion) rt.portraitTime += Math.min(dt, 0.25)
     // 멀리서는 행성계(별)만 가리킨다. 수만 개의 작은 점을 하나하나 고를 수는 없다
     const near = lookDist < 1500 * world.scale
-    rt.hover = canHover && near ? pick(world, cam, state.size.width, state.size.height, rt.pointer!) : -1
-    rt.hoverStar = canHover && rt.hover < 0 ? pickStar(world, cam, state.size.width, state.size.height, rt.pointer!) : -1
-    gl.domElement.style.cursor = rt.hover >= 0 || rt.hoverStar >= 0 ? 'pointer' : rt.dragging ? 'grabbing' : 'grab'
+    rt.hover = canHover && near && !portrait ? pick(world, cam, state.size.width, state.size.height, rt.pointer!) : -1
+    const portraitSystem = portrait ? getState().system! : -1
+    const portraitHover =
+      canHover && portrait ? pickPortrait(world, portraitSystem, cam, state.size.width, state.size.height, rt.pointer!, 18) : -1
+    rt.hoverStar =
+      canHover && rt.hover < 0 && portraitHover < 0
+        ? pickStar(world, cam, state.size.width, state.size.height, rt.pointer!, portraitSystem, 18)
+        : -1
+    if (portrait) {
+      if (rt.dragging) gl.domElement.style.cursor = 'grabbing'
+      else gl.domElement.style.cursor = portraitHover >= 0 || rt.hoverStar >= 0 ? 'pointer' : 'grab'
+    } else gl.domElement.style.cursor = rt.hover >= 0 || rt.hoverStar >= 0 ? 'pointer' : rt.dragging ? 'grabbing' : 'grab'
     rt.drawOverlay?.()
   }, -2)
 
@@ -209,6 +279,7 @@ export function Scene({ world }: { world: World }) {
       <GalaxyPoints world={world} />
       <Systems world={world} />
       <Planets world={world} />
+      <SystemDiorama world={world} />
       <Routes world={world} />
     </>
   )

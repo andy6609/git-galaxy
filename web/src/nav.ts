@@ -5,6 +5,14 @@ import { ingest, loadWorld, normalizeQuery, resolveOnServer, resolveQuery, type 
 import { ensureDetail, getState, setState } from './store'
 import { logNav, rt, type NavVia } from './world/runtime'
 
+function navigationUrl(query: string, via: NavVia) {
+  const next = `${location.pathname}${query}`
+  const current = `${location.pathname}${location.search}`
+  if (next === current) return
+  if (via === 'url') history.replaceState(null, '', next)
+  else history.pushState(null, '', next)
+}
+
 export function arrivalDistance(radius: number, fov: number) {
   // 행성이 화면 높이의 약 55%를 차지한다 (PROTOTYPE_SPEC §9)
   return radius / Math.sin(THREE.MathUtils.degToRad(fov) * 0.275)
@@ -17,6 +25,8 @@ export function goToPlanet(world: World, index: number, via: NavVia) {
   const look = world.looks[index]
   const dest = new THREE.Vector3(...p.pos)
   setState({ focus: index, system: null, phase: 'travel', notFound: null })
+  navigationUrl(`?p=${encodeURIComponent(p.id)}`, via)
+  document.title = `${p.n} · Open-source Galaxy`
   ensureDetail(world, p.sys)
   logNav(via, p.n)
   rt.rig.flyTo(cam, {
@@ -28,7 +38,6 @@ export function goToPlanet(world: World, index: number, via: NavVia) {
     revisit: via === 'url' || !!getState().visited[index],
     onArrive: () => {
       setState((s) => ({ phase: 'orbit', visited: { ...s.visited, [index]: true } }))
-      history.replaceState(null, '', `?p=${p.id}`)
     },
   })
 }
@@ -38,13 +47,42 @@ export function showSystem(world: World, k: number, via: NavVia) {
   const cam = rt.camera
   if (!cam) return
   const s = world.systems[k]
-  const radius = world.systemRadius(k) + 4
   setState({ focus: null, system: k, phase: 'travel', notFound: null })
+  navigationUrl(`?u=${encodeURIComponent(s.login)}`, via)
+  document.title = `@${s.login}의 행성계 · Open-source Galaxy`
   ensureDetail(world, k)
   logNav(via, `user:${s.login}`)
-  rt.rig.frame(cam, new THREE.Vector3(...s.c), radius * 1.05, () => {
-    setState({ phase: 'survey' })
-    history.replaceState(null, '', `?u=${s.login}`)
+  // canonical 궤도는 장부에 유지하되, 계정의 첫 화면은 고정된 장난감 디오라마로 보여 준다 (D20).
+  const center = new THREE.Vector3(...s.c)
+  const direction = new THREE.Vector3(0.82, 0.62, 1).normalize()
+  rt.rig.flyTo(cam, {
+    dest: center,
+    arriveDir: direction,
+    // 서로 다른 궤도면이 위아래로 벌어져도 대표 행성 여섯 개가 한 프레임에 남도록 여유를 둔다 (D21).
+    arriveDistance: innerWidth < 640 ? 60 : 50,
+    minRadius: innerWidth < 640 ? 50 : 40,
+    // 계정 검색은 결과 확인이 목적이다. 첫 진입도 6초 안쪽의 축약 항해를 쓴다.
+    revisit: true,
+    onArrive: () => {
+      setState({ phase: 'survey' })
+    },
+  })
+}
+
+/** 쿼리가 없는 주소로 돌아왔을 때 첫 은하 관측 화면을 복원한다. */
+export function showGalaxy(world: World) {
+  const cam = rt.camera
+  if (!cam) return
+  const radius = Math.max(...world.galaxies.map((g) => Math.hypot(g.c[0], g.c[2]) + g.r), 1000)
+  setState({ focus: null, system: null, phase: 'travel', notFound: null })
+  document.title = 'Open-source Galaxy'
+  rt.rig.flyTo(cam, {
+    dest: new THREE.Vector3(),
+    arriveDir: new THREE.Vector3(0.34, 0.66, 0.67).normalize(),
+    arriveDistance: radius * 1.45,
+    minRadius: 6,
+    revisit: true,
+    onArrive: () => setState({ phase: 'survey' }),
   })
 }
 

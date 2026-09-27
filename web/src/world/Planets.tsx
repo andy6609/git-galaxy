@@ -92,9 +92,11 @@ export function Planets({ world }: { world: World }) {
     const tanV = Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2)
     const aspect = size.width / size.height
     const cosLimit = Math.cos(Math.atan(tanV * Math.sqrt(1 + aspect * aspect)) + 0.08)
-    const focus = getState().focus
+    const { focus, system } = getState()
     let n = 0
     for (let i = 0; i < world.count; i++) {
+      // 계정 초상에서는 같은 repo를 canonical 좌표와 디오라마에 두 번 그리지 않는다.
+      if (system !== null && focus === null && world.planets[i].sys === system) continue
       const dx = P[i * 3] - cx
       const dy = P[i * 3 + 1] - cy
       const dz = P[i * 3 + 2] - cz

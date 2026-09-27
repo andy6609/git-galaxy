@@ -21,8 +21,14 @@ export function Search({ world }: { world: World }) {
 
   return (
     <div className={`search ${phase === 'intro' ? 'is-intro' : ''}`}>
-      {phase === 'intro' && <p className="tagline">이 안 어딘가에, 당신이 만든 것이 있습니다.</p>}
+      {phase === 'intro' && (
+        <div className="intro-copy">
+          <h1>당신의 GitHub가 작은 우주가 됩니다.</h1>
+          <p>아이디만 입력하세요. 로그인 없이 공개 저장소로 행성계를 먼저 보여 드립니다.</p>
+        </div>
+      )}
       <form
+        className="search-form"
         onSubmit={(e) => {
           e.preventDefault()
           if (active >= 0 && options[active]) go(options[active].value, 'suggest')
@@ -54,6 +60,9 @@ export function Search({ world }: { world: World }) {
           autoComplete="off"
           spellCheck={false}
         />
+        <button type="submit" disabled={!q.trim()}>
+          {phase === 'intro' ? '내 행성계 만들기' : '찾기'}
+        </button>
       </form>
       {options.length > 0 && (
         <ul className="suggest" role="listbox">
@@ -76,12 +85,12 @@ export function Search({ world }: { world: World }) {
       )}
       {ingesting && (
         <p className="notfound is-busy">
-          <b>{ingesting}</b>의 공개 repo를 관측하는 중입니다. 그동안 우주를 둘러보셔도 됩니다.
+          <b>{ingesting}</b>의 공개 저장소를 관측해 행성계를 만들고 있습니다. 그동안 우주를 둘러보셔도 됩니다.
         </p>
       )}
       {notFound && !ingesting && (
         <p className="notfound">
-          <b>{notFound}</b> — 찾지 못했습니다. username이면 GitHub에서 가져와 이 우주에 들입니다.
+          <b>{notFound}</b> — 찾지 못했습니다. GitHub username이나 owner/repo를 확인해 주세요.
         </p>
       )}
     </div>

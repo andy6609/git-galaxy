@@ -7,6 +7,7 @@ import { getState, repoDetail, routesFor } from '../store'
 import { projector } from './project'
 import { rt } from './runtime'
 import { starCore } from './Systems'
+import { portraitLayout, portraitWorldPosition } from './systemPortrait'
 
 type Kind = 'galaxy' | 'region' | 'system' | 'landmark' | 'out' | 'in' | 'near'
 type Candidate = { x: number; y: number; z: number; text: string; kind: Kind; radius: number; key: string }
@@ -89,17 +90,32 @@ class Layer {
       for (const r of inc) c.push(this.planet(r.to, 'in'))
       for (const i of rt.visibleSpheres.slice(0, 12)) c.push(this.planet(i, 'near'))
     }
-    // 행성계 전체를 보고 있으면 그 행성들의 이름
-    if (system !== null && focus === null) for (const i of world.members[system].slice(0, 24)) c.push(this.planet(i, 'near'))
-    // 가까운 중심별의 이름
+    // 계정 초상에서는 canonical 궤도 대신 대표 행성의 디오라마 위치에 이름을 붙인다 (D20).
+    if (system !== null && focus === null) {
+      for (const hero of portraitLayout(world, system)) {
+        const [x, y, z] = portraitWorldPosition(world, system, hero, rt.portraitTime)
+        const name = world.planets[hero.index].n.split('/')[1]
+        c.push({
+          x,
+          y,
+          z,
+          text: name.length > 25 ? `${name.slice(0, 23)}…` : name,
+          kind: 'near',
+          radius: hero.radius,
+          key: `portrait-${hero.index}`,
+        })
+      }
+    }
+    // 가까운 중심별의 이름. 계정 초상에서도 배경의 별은 실제 다음 목적지다.
     const u = world.scale
     if (camDist < 900 * u) {
-      const { x, y, z } = cam.position
+      const [x, y, z] = system === null ? [cam.position.x, cam.position.y, cam.position.z] : world.systems[system].c
       const near = world.systems
         .map((s, k) => [k, (s.c[0] - x) ** 2 + (s.c[1] - y) ** 2 + (s.c[2] - z) ** 2] as const)
+        .filter(([k]) => k !== system)
         .filter(([, d2]) => d2 < (700 * u) ** 2)
         .sort((a, b) => a[1] - b[1])
-        .slice(0, 30)
+        .slice(0, system === null ? 30 : 8)
       for (const [k] of near) {
         const s = world.systems[k]
         c.push({ x: s.c[0], y: s.c[1], z: s.c[2], text: s.login, kind: 'system', radius: starCore(s.n), key: `s${k}` })
@@ -230,7 +246,7 @@ class Layer {
         const s = world.systems[rt.hoverStar]
         line('hc-name', `${s.login}의 행성계`)
         line('hc-desc', `행성 ${s.n}개${s.truncated ? '+' : ''} · ${world.galaxies[s.gal]?.name ?? '관계 미확정'}`)
-        line('hc-rel', '별은 계정, 행성은 그 계정의 repo — 안쪽 궤도일수록 먼저 만든 것')
+        line('hc-rel', `선택하면 @${s.login}의 행성계로 이동`)
       }
       this.cardFor = key
     }
