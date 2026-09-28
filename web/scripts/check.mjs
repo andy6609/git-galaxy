@@ -34,6 +34,32 @@ const check = (name, ok, detail = '') => {
   console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}${detail ? ` — ${detail}` : ''}`)
   if (!ok) failed++
 }
+
+// The landing UI must not wait for the large world response. This protects the
+// first impression from Vercel cold starts and slow mobile connections.
+const landing = await browser.newPage()
+await landing.setViewport({ width: 1280, height: 800 })
+await landing.setRequestInterception(true)
+let releaseWorld
+const worldIntercepted = new Promise((resolve) => {
+  landing.on('request', (request) => {
+    if (request.url().includes('/api/world')) {
+      releaseWorld = () => request.continue()
+      resolve()
+    } else request.continue()
+  })
+})
+await landing.goto(BASE, { waitUntil: 'domcontentloaded' })
+await Promise.race([worldIntercepted, sleep(2000)])
+// 입장 애니메이션(0.12s 지연 + 0.7s)이 끝날 만큼만 기다린다. world는 아직 붙잡아 둔 채로
+await sleep(1000)
+const instantHero = await landing
+  .$eval('.intro-copy h1', (element) => ({ text: element.textContent, visible: getComputedStyle(element).opacity !== '0' }))
+  .catch(() => ({ text: '', visible: false }))
+check('world 응답 전에도 랜딩 문구가 보인다', instantHero.visible && instantHero.text.includes('Your GitHub'), JSON.stringify(instantHero))
+releaseWorld?.()
+await landing.close()
+
 const search = async (q) => {
   await page.click('.search input', { count: 3 })
   await page.keyboard.press('Backspace')
@@ -69,7 +95,7 @@ check('Esc로 항해 건너뛰기', skipped)
 const desc = await page.waitForSelector('.plate.is-shown .p-desc', { timeout: 8000 }).then(() => page.$eval('.plate.is-shown .p-desc', (e) => e.textContent)).catch(() => '')
 check('명판: 서버에서 받은 설명', desc.length > 5, desc.slice(0, 50))
 const place = await page.$eval('.plate.is-shown .p-place', (e) => e.textContent).catch(() => '')
-check('명판: 행성계와 궤도', place.includes('mrdoob') && place.includes('궤도'), place)
+check('명판: 행성계와 궤도', place.includes('mrdoob') && place.includes('Orbit'), place)
 
 await search('https://github.com/pmndrs/zustand/tree/main')
 s = await state()

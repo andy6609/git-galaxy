@@ -154,7 +154,7 @@ body {
   top: 64%;
   width: min(620px, calc(100vw - 32px));
   text-align: center;
-  animation: rise 1.2s 2.6s both;
+  animation: rise 0.7s 0.12s both;
 }
 .intro-copy {
   margin: 0 auto 18px;

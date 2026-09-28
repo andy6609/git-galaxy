@@ -4,7 +4,7 @@ import { copyFor } from '../i18n'
 import { submitQuery } from '../nav'
 import { setState, useStore } from '../store'
 
-export function Search({ world }: { world: World }) {
+export function Search({ world, loadError }: { world: World | null; loadError?: string | null }) {
   const phase = useStore((s) => s.phase)
   const notFound = useStore((s) => s.notFound)
   const ingesting = useStore((s) => s.ingesting)
@@ -13,9 +13,10 @@ export function Search({ world }: { world: World }) {
   const [q, setQ] = useState('')
   const [active, setActive] = useState(-1)
   const input = useRef<HTMLInputElement>(null)
-  const options = useMemo(() => suggest(world, q, 6, language), [world, q, language])
+  const options = useMemo(() => (world ? suggest(world, q, 6, language) : []), [world, q, language])
 
   const go = (value: string, via: 'search' | 'suggest') => {
+    if (!world) return
     setQ('')
     setActive(-1)
     input.current?.blur()
@@ -35,7 +36,7 @@ export function Search({ world }: { world: World }) {
         onSubmit={(e) => {
           e.preventDefault()
           if (active >= 0 && options[active]) go(options[active].value, 'suggest')
-          else if (q.trim()) go(q, 'search')
+          else if (q.trim() && world) go(q, 'search')
         }}
       >
         <input
@@ -63,10 +64,15 @@ export function Search({ world }: { world: World }) {
           autoComplete="off"
           spellCheck={false}
         />
-        <button type="submit" disabled={!q.trim()}>
+        <button type="submit" disabled={!world || !q.trim()}>
           {phase === 'intro' ? c.createSystem : c.find}
         </button>
       </form>
+      {!world && (
+        <p className={`notfound ${loadError ? '' : 'is-busy'}`} role="status">
+          {loadError ? c.loadFailed(loadError) : c.loading}
+        </p>
+      )}
       {options.length > 0 && (
         <ul className="suggest" role="listbox">
           {options.map((o, k) => (

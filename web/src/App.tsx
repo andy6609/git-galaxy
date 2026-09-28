@@ -71,19 +71,23 @@ export default function App() {
         <color attach="background" args={['#0A1114']} />
         {scene}
       </Canvas>
+      {!view && (
+        <>
+          <Search world={world} loadError={error} />
+          <LanguageSwitch />
+        </>
+      )}
       {world && !view && (
         <>
           <Overlay world={world} />
-          <Search world={world} />
           <Plate world={world} />
           <SystemPlate world={world} />
           <Info world={world} />
-          <LanguageSwitch />
         </>
       )}
       {world && view === 'gallery' && <GalleryLabels world={world} indices={indices} grid={grid} pad={0.8} />}
       {world && view === 'oatmeal' && <OatmealUI world={world} />}
-      {!world && <div className="loading">{error ? c.loadFailed(error) : c.loading}</div>}
+      {!world && view && <div className="loading">{error ? c.loadFailed(error) : c.loading}</div>}
     </div>
   )
 }
