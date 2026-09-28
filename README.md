@@ -1,55 +1,264 @@
-# Open-source Galaxy
+<div align="center">
 
-내가 만든 것이 거대한 오픈소스 생태계 안에서 어떤 장소를 차지하는지 발견하는 우주.
-**별 하나가 계정 하나**이고, 그 둘레를 도는 **행성이 그 계정의 repo**입니다 (안쪽 궤도일수록 먼저 만든 것).
-비슷한 일을 하는 계정들이 모여 지역과 은하가 되고, 확인된 dependency가 행성 사이의 항로가 됩니다.
+# Git Galaxy
 
-지금은 **Prototype** 단계입니다. npm·PyPI·Rust 생태계에서 고른 계정 표본으로 우주를 만들고,
-아직 없는 계정을 검색하면 서버가 GitHub에서 가져와 그 자리에서 들입니다 (Git City처럼).
+**Discover where your GitHub work lives in the open-source universe.**
 
-## 문서
+Every GitHub account becomes a star system. Every public repository becomes a planet.
+Related builders gather into regions and galaxies shaped by real project data.
 
-| 문서 | 내용 |
-|---|---|
-| [docs/PLAN.md](docs/PLAN.md) | 원본 기획안 (원문 보존) |
-| [docs/DIRECTION.md](docs/DIRECTION.md) | 검토 후 내린 결정. PLAN.md와 충돌하면 이쪽이 우선 |
-| [docs/PROTOTYPE_SPEC.md](docs/PROTOTYPE_SPEC.md) | Prototype 범위, 실험 순서, 통과 기준 |
-| [docs/experiments/](docs/experiments/) | 실험 기록 |
+[Explore the live universe](https://git-galaxy-bice.vercel.app) · [Read the product direction](docs/DIRECTION.md) · [See the prototype spec](docs/PROTOTYPE_SPEC.md)
 
-## 실행
+</div>
 
-```sh
-# 1. 데이터 (Python 3.9+)
-python3 -m venv .venv
-.venv/bin/pip install numpy scipy scikit-learn umap-learn leidenalg igraph fastapi "uvicorn[standard]"
-.venv/bin/python pipeline/collect.py      # npm 표본 → data/build/collected.json (계정 고르기의 출발점)
-.venv/bin/python pipeline/accounts.py     # 계정과 그 repo·dependency → data/build/accounts.json
-.venv/bin/python pipeline/universe.py     # 배치 → data/universe.db (장부), data/model/ (새 계정용 고정 모델)
-                                          # API 응답은 모두 data/raw/cache에 캐시된다
+![Git Galaxy universe view](docs/experiments/E1d/universe.jpg)
 
-# 2. 서버 (8787)
-.venv/bin/uvicorn server.app:app --port 8787
-# GITHUB_TOKEN=... 을 주면 새 계정 들이기가 시간당 30개 → 2,500개로 넉넉해진다
+> [!NOTE]
+> Git Galaxy is an early prototype. The current universe is a growing sample, not a complete map of GitHub. Search for a public GitHub account to place it in the shared universe.
 
-# 3. 클라이언트 (5173, /api는 서버로 넘어간다)
-cd web && npm install && npm run dev
+## What is Git Galaxy?
+
+Git Galaxy turns public repository data into a navigable 3D world:
+
+- **Account → star system.** A GitHub user or organization owns one stable system.
+- **Repository → planet.** Public, non-fork repositories orbit their account's star.
+- **Creation order → orbit.** Older repositories stay closer to the center; newer ones appear farther out.
+- **Project data → appearance.** Repository identity, language, age, and activity influence the planet without turning popularity into beauty.
+- **Similarity → geography.** Accounts working on related things form regions and galaxies.
+- **Verified dependencies → routes.** A route represents a known relationship, not a decorative connection.
+
+The goal is not to rank developers. It is to make open source feel like a place: somewhere you can find your own work, understand its neighborhood, and choose where to travel next.
+
+## Try it
+
+Open **[git-galaxy-bice.vercel.app](https://git-galaxy-bice.vercel.app)** and search for:
+
+- a GitHub username, such as `andy6609`
+- a repository, such as `facebook/react`
+- a full GitHub repository URL
+- a known package name
+
+No GitHub login is required. Git Galaxy reads public metadata only.
+
+Direct links are supported:
+
+```text
+?u=USERNAME       open an account's star system
+?r=OWNER/REPO     open a repository planet
+?p=REPOSITORY_ID  open a planet by its stable GitHub ID
 ```
 
-- `?u=username` 그 계정의 행성계 (없으면 들인다), `?r=owner/repo` 행성, `?p=repo-id` 영구 주소
-- `?view=gallery&seed=3` 행성 12개 비교 (`&blind`로 이름 숨김, `&look=1`로 외형 v1)
-- `?view=oatmeal` 사람 대상 오트밀 테스트 (E2). 진행 방법은 [docs/experiments/E2-planets.md](docs/experiments/E2-planets.md)
-- `npm run check` 흐름 스모크 테스트 · `npm run shot -- shots/` 장면 캡처와 프레임 시간 · `node scripts/structure.mjs` 배율별 캡처
+## Why it feels different
 
-`data/include.txt`에 테스트 참가자를 적습니다 (`user:NAME`).
+Git Galaxy deliberately avoids a few common visualization shortcuts:
 
-## 장부
+- Stars do not make a planet larger or more beautiful. Popularity only affects long-distance visibility.
+- Small and zero-star repositories receive the same arrival treatment as famous projects.
+- Coordinates are persistent. Once a system is placed, changing metadata does not move its address.
+- Unknown data is not presented as zero.
+- Decorative stars and dust are never counted as repositories.
+- The same planet remains the same object as the camera moves from galaxy scale to orbit.
 
-`data/universe.db`(SQLite)가 좌표 장부입니다. 계정 → 행성계 중심·궤도면, repo → 궤도·각도·좌표.
-한 번 놓인 행성계와 행성은 움직이지 않습니다. 새 계정은 서버가 고정 모델로 가장 비슷한 계정들 근처 빈자리에 놓고,
-새 repo는 바깥 궤도로 들어갑니다. `universe.py`는 장부가 이미 있으면 멈추고, `--reset`을 명시해야 새로 만듭니다.
+These rules keep the world expressive without pretending that GitHub metrics measure quality.
 
-## 데이터 출처
+## Run locally
 
-- [ecosyste.ms](https://ecosyste.ms) — 패키지와 repo 정보. 데이터 CC BY-SA 4.0, 이 우주의 파생 데이터도 같은 라이선스를 따릅니다.
-- [deps.dev](https://deps.dev) — npm · PyPI · Cargo dependencies
-- GitHub REST API — include 목록과 새로 들이는 계정
+### Requirements
+
+- Python 3.12
+- Node.js 20.19 or newer (or Node.js 22.12+)
+- npm
+
+### Fastest path
+
+The repository includes a versioned SQLite universe snapshot, so you can run the existing world without collecting data first.
+
+```bash
+git clone https://github.com/andy6609/git-galaxy.git
+cd git-galaxy
+
+python3.12 -m venv .venv
+.venv/bin/pip install -r requirements.txt "uvicorn[standard]"
+
+npm --prefix web ci
+npm --prefix web run build
+
+.venv/bin/uvicorn server.app:app --port 8787
+```
+
+Open [http://localhost:8787](http://localhost:8787).
+
+### Development mode
+
+Run the API and Vite development server in separate terminals:
+
+```bash
+# Terminal 1: API
+.venv/bin/uvicorn server.app:app --reload --port 8787
+
+# Terminal 2: web client
+npm --prefix web run dev
+```
+
+Open [http://localhost:5173](http://localhost:5173). Vite proxies `/api` requests to port `8787`.
+
+### Optional environment variables
+
+Copy `.env.example` or export variables in your shell:
+
+```bash
+# Use Postgres/Supabase instead of the local SQLite ledger.
+POSTGRES_URL=postgresql://...
+
+# Increase GitHub API capacity for accounts added through search.
+GITHUB_TOKEN=github_pat_...
+```
+
+Never expose either value to the browser. Both are server-only credentials.
+
+## How account ingestion works
+
+Git Galaxy does not attempt to crawl all of GitHub in advance.
+
+1. The client resolves a username, repository, URL, or package against the existing ledger.
+2. If a valid username is missing, the API reads its public repositories from GitHub.
+3. When GitHub is unavailable or rate-limited, the importer can fall back to ecosyste.ms.
+4. A fixed placement model finds related accounts and chooses an unoccupied nearby position.
+5. The API records the final coordinates. Later metadata changes do not move the system.
+
+Without `GITHUB_TOKEN`, GitHub's anonymous API limit is shared by ingestion requests. A token raises the limit, but is not required to browse the existing universe.
+
+## Architecture
+
+```text
+GitHub / ecosyste.ms / deps.dev
+              │
+              ▼
+       collection pipeline
+              │
+       relationship + layout
+              │
+              ▼
+   persistent coordinate ledger
+      SQLite locally / Postgres
+              │
+              ▼
+          FastAPI API
+              │
+              ▼
+ React + React Three Fiber + Three.js
+```
+
+| Area | Main files | Responsibility |
+|---|---|---|
+| Web client | `web/src/` | Search, navigation state, camera transitions, planets, star systems, and UI |
+| API | `server/app.py` | World snapshot, system details, search resolution, suggestions, and lazy ingestion |
+| Database adapter | `server/database.py` | SQLite for local development, Postgres when `POSTGRES_URL` exists |
+| Data pipeline | `pipeline/` | Collect accounts, derive relationships, create communities, and generate stable placement data |
+| Postgres schema | `supabase/migrations/` | Server-only ledger tables and access restrictions |
+| Experiments | `docs/experiments/` | Visual studies, evaluation notes, and screenshots behind design decisions |
+
+## API reference
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| `GET` | `/api/world` | Galaxies, regions, star systems, minimal planet data, sources, and observation statistics |
+| `GET` | `/api/system/{account_id}` | One account, its repository metadata, and incoming/outgoing routes |
+| `GET` | `/api/resolve?q=...` | Resolve a username, repository, GitHub URL, or package to a destination |
+| `GET` | `/api/suggest?q=...` | Return up to six account and repository suggestions |
+| `POST` | `/api/ingest/{login}` | Add a missing public GitHub account to the persistent universe |
+
+Username ingestion accepts GitHub-compatible names up to 39 characters. Failed lookups are cached briefly to avoid repeatedly hitting upstream APIs.
+
+## Build and checks
+
+```bash
+# Type-check and create a production web build
+npm --prefix web run build
+
+# Run the browser flow smoke check while the local app is running
+npm --prefix web run check
+
+# Capture experiment screenshots
+npm --prefix web run shot -- shots/
+```
+
+The screenshot and smoke-check scripts use a local Chrome or Chromium installation through Puppeteer Core.
+
+## Rebuild the universe
+
+You do not need this step to run the included snapshot. Use it when working on collection or placement:
+
+```bash
+.venv/bin/pip install umap-learn
+.venv/bin/python pipeline/collect.py
+.venv/bin/python pipeline/accounts.py
+.venv/bin/python pipeline/universe.py
+```
+
+API responses and intermediate files are cached under ignored paths in `data/raw/` and `data/build/`. The canonical SQLite ledger and fixed placement model are versioned. `pipeline/universe.py` refuses to replace an existing ledger unless you explicitly pass `--reset`.
+
+To import the checked-in universe into an empty Supabase/Postgres database:
+
+```bash
+POSTGRES_URL_NON_POOLING=postgresql://... \
+  .venv/bin/python scripts/import_sqlite_to_postgres.py
+```
+
+See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for the Vercel and Supabase deployment flow.
+
+## Contributing
+
+Contributions are welcome, especially in these areas:
+
+- making planet silhouettes easier to recognize
+- improving camera travel and system-to-system discovery
+- improving keyboard, touch, reduced-motion, and screen-reader behavior
+- making placement quality measurable and reproducible
+- adding synthetic fixtures and automated tests
+- reducing rendering cost on mobile and integrated GPUs
+
+Before opening a pull request:
+
+1. Create a focused branch.
+2. Keep repository coordinates deterministic and preserve existing ledger entries.
+3. Do not invent dependency routes or turn missing data into zero.
+4. Run `npm --prefix web run build`.
+5. Include before/after screenshots for visible changes.
+6. Explain which user experience or data invariant the change protects.
+
+For larger product or data-model changes, read [docs/DIRECTION.md](docs/DIRECTION.md) first and open an issue before investing in a large implementation.
+
+## Data and attribution
+
+- [ecosyste.ms](https://ecosyste.ms) supplies package and repository metadata. Derived universe data is distributed under **CC BY-SA 4.0**.
+- [deps.dev](https://deps.dev) supplies dependency information for supported package ecosystems.
+- The [GitHub REST API](https://docs.github.com/en/rest) supplies public account and repository metadata for explicitly included or searched accounts.
+
+A public repository is not automatically open source. Git Galaxy keeps license status as separate metadata and does not present an unknown license as permission to reuse code.
+
+## Project status and license
+
+Git Galaxy is a prototype under active development. APIs, visuals, placement versions, and stored data may change.
+
+The derived universe dataset is covered by **CC BY-SA 4.0** as noted above. A license for this repository's source code has not yet been added, so do not assume permission to copy, modify, or redistribute the code until a license file is published.
+
+## Documentation
+
+| Document | What it contains |
+|---|---|
+| [Product plan](docs/PLAN.md) | Original product vision and long-term system design |
+| [Direction log](docs/DIRECTION.md) | Current decisions and the reasoning behind them; takes precedence over the original plan |
+| [Prototype specification](docs/PROTOTYPE_SPEC.md) | Prototype scope, experiments, and pass/fail criteria |
+| [Product review](docs/PRODUCT_REVIEW.md) | User-flow and presentation review |
+| [Exploration-flow review](docs/EXPLORATION_FLOW_REVIEW.md) | Search, travel, arrival, and onward-discovery audit |
+| [Deployment guide](docs/DEPLOYMENT.md) | Vercel, Supabase, schema migration, and data import |
+| [Experiment log](docs/experiments/) | Visual evidence and design experiments |
+
+---
+
+<div align="center">
+
+**A repository can be small and still be a place worth visiting.**
+
+</div>
