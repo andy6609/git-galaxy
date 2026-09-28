@@ -1,5 +1,5 @@
 // 캔버스 안의 세계: 카메라 갱신 → 가리키기 → 오버레이. 입력은 캔버스에 직접 붙인다.
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { World } from '../data'
@@ -107,6 +107,7 @@ export function Scene({ world }: { world: World }) {
     rt.camera = camera as THREE.PerspectiveCamera
     rt.camera.far = Math.max(16000, R * 7)
     rt.camera.updateProjectionMatrix()
+    rt.rig.beginIntro()
     rt.rig.update(0, rt.camera)
     // 공유 링크: 은하 전체를 잠깐 보여준 뒤 짧게 항해한다 (PLAN.md L)
     const t = setTimeout(() => openFromUrl(world), 700)
@@ -241,6 +242,12 @@ export function Scene({ world }: { world: World }) {
   }, [gl, world, size.width, size.height])
 
   // 카메라를 가장 먼저 움직여야 이 프레임의 라벨·가리키기가 흔들리지 않는다
+  // 첫 몇 프레임(셰이더 컴파일로 무겁다)을 그린 뒤에 떠오르기 시작한다. 도중에 끊기지 않게
+  const frames = useRef(0)
+  useFrame(() => {
+    if (++frames.current === 3) gl.domElement.closest('.canvas')?.classList.add('is-lit')
+  })
+
   useFrame((state, dt) => {
     const cam = state.camera as THREE.PerspectiveCamera
     rt.pxScale = state.size.height / (2 * Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2))

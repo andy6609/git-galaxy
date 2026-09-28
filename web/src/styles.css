@@ -37,6 +37,31 @@ body {
 .canvas {
   touch-action: none;
 }
+/* 우주는 첫 프레임을 그린 뒤 어둠에서 천천히 떠오른다 (Scene이 is-lit을 붙인다) */
+.canvas.is-dim {
+  opacity: 0;
+  transition: opacity 3.2s cubic-bezier(0.3, 0.1, 0.3, 1);
+}
+.canvas.is-dim.is-lit {
+  opacity: 1;
+}
+.overlay {
+  animation: fade-in 2.4s 1.2s both;
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .canvas.is-dim {
+    transition-duration: 0.6s;
+  }
+  .overlay {
+    animation-duration: 0.4s;
+    animation-delay: 0s;
+  }
+}
 
 /* ---------------------------------------------------------------- 오버레이 */
 .overlay {

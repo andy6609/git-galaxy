@@ -68,23 +68,37 @@ export class CameraRig {
   private pendingTheta = 0
   private pendingPhi = 0
   private pendingZoom = 0
+  /** 첫 화면: 멀리서 천천히 다가오며 은하들이 떠오른다. 사용자가 만지거나 항해를 시작하면 그 자리에서 멈춘다 */
+  private intro: { t: number; duration: number; from: number; to: number; phi0: number; phi1: number } | null = null
 
   get traveling() {
     return this.travel !== null
   }
 
+  /** 지금 spherical을 도착점으로 두고, 더 멀고 조금 더 위에서 출발한다 */
+  beginIntro() {
+    if (this.reducedMotion) return
+    const sp = this.spherical
+    this.intro = { t: 0, duration: 4.2, from: sp.radius * 1.7, to: sp.radius, phi0: sp.phi - 0.22, phi1: sp.phi }
+    sp.radius = this.intro.from
+    sp.phi = this.intro.phi0
+  }
+
   rotate(dx: number, dy: number) {
+    this.intro = null
     this.autoRotate = 0
     this.pendingTheta -= dx * 0.0055
     this.pendingPhi -= dy * 0.0055
   }
 
   zoom(delta: number) {
+    this.intro = null
     this.autoRotate = 0
     this.pendingZoom += delta * 0.0012
   }
 
   stopAuto() {
+    this.intro = null
     this.autoRotate = 0
   }
 
@@ -118,6 +132,7 @@ export class CameraRig {
     }
     this.curveLut = null
     this.autoRotate = 0
+    this.intro = null
     this.pendingTheta = this.pendingPhi = this.pendingZoom = 0
     this.reveal = 0
   }
@@ -201,6 +216,14 @@ export class CameraRig {
     this.pendingPhi -= dPhi
     this.pendingZoom -= dZoom
     const sp = this.spherical
+    const intro = this.intro
+    if (intro) {
+      intro.t = Math.min(1, intro.t + dt / intro.duration)
+      const e = 1 - (1 - intro.t) ** 3
+      sp.radius = intro.from + (intro.to - intro.from) * e
+      sp.phi = intro.phi0 + (intro.phi1 - intro.phi0) * e
+      if (intro.t >= 1) this.intro = null
+    }
     sp.theta += dTheta + this.autoRotate * dt
     sp.phi = clamp(sp.phi + dPhi, 0.12, Math.PI - 0.12)
     sp.radius = clamp(sp.radius * Math.exp(dZoom), this.minRadius, this.maxRadius)

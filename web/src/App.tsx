@@ -62,7 +62,7 @@ export default function App() {
   return (
     <div className="app">
       <Canvas
-        className="canvas"
+        className={view ? 'canvas' : 'canvas is-dim'}
         flat
         dpr={view === 'probe' ? 1 : [1, 2]}
         gl={{ antialias: true, powerPreference: 'high-performance', preserveDrawingBuffer: view === 'probe' }}
