@@ -20,12 +20,9 @@ import {
   type PortraitHero,
 } from './systemPortrait'
 
-const ROLE_LABEL: Record<PortraitHero['role'], string> = {
-  first: '첫 저장소',
-  recent: '최근 저장소',
-  signal: '멀리 보이는 저장소',
-  variety: '다른 결의 저장소',
-  archive: '시간축의 저장소',
+const ROLE_LABEL: Record<'en' | 'ko', Record<PortraitHero['role'], string>> = {
+  en: { first: 'first repository', recent: 'recent repository', signal: 'distant signal', variety: 'different material', archive: 'repository across time' },
+  ko: { first: '첫 저장소', recent: '최근 저장소', signal: '멀리 보이는 저장소', variety: '다른 결의 저장소', archive: '시간축의 저장소' },
 }
 
 function Orbit({ hero }: { hero: PortraitHero }) {
@@ -148,6 +145,7 @@ function ToyPlanet({
   systemCenter: [number, number, number]
 }) {
   const group = useRef<THREE.Group>(null)
+  const language = useStore((s) => s.language)
   const p = world.planets[hero.index]
   const look = world.looks[hero.index]
   const palette = PALETTES[look.palette]
@@ -197,7 +195,7 @@ function ToyPlanet({
         onPointerOut={(e) => {
           ;(e.nativeEvent.target as HTMLElement).style.cursor = 'grab'
         }}
-        userData={{ label: `${p.n} · ${ROLE_LABEL[hero.role]}` }}
+        userData={{ label: `${p.n} · ${ROLE_LABEL[language][hero.role]}` }}
       />
       <group position={[0, hero.radius * 1.04, 0]} rotation-y={(hash % 11) * 0.31}>
         {main === 0 && <Observatory scale={1.02 + hero.radius * 0.12} accent={accent} />}

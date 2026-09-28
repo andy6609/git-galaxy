@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { loadWorld } from './data'
+import { copyFor } from './i18n'
 import { goToPlanet, showSystem } from './nav'
 import { getState, setState, useStore } from './store'
 import { GalleryLabels, galleryPlanets, PlanetGrid, type Grid } from './ui/Gallery'
 import { Info } from './ui/Info'
+import { LanguageSwitch } from './ui/LanguageSwitch'
 import { OatmealScene, OatmealUI } from './ui/Oatmeal'
 import { Plate, SystemPlate } from './ui/Plate'
 import { Search } from './ui/Search'
@@ -20,6 +22,8 @@ const markProbeReady = () => Object.assign(window, { __probeReady: true })
 
 export default function App() {
   const world = useStore((s) => s.world)
+  const language = useStore((s) => s.language)
+  const c = copyFor(language)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -74,11 +78,12 @@ export default function App() {
           <Plate world={world} />
           <SystemPlate world={world} />
           <Info world={world} />
+          <LanguageSwitch />
         </>
       )}
       {world && view === 'gallery' && <GalleryLabels world={world} indices={indices} grid={grid} pad={0.8} />}
       {world && view === 'oatmeal' && <OatmealUI world={world} />}
-      {!world && <div className="loading">{error ? `관측 자료를 불러오지 못했습니다 — ${error}` : '관측 자료를 불러오는 중'}</div>}
+      {!world && <div className="loading">{error ? c.loadFailed(error) : c.loading}</div>}
     </div>
   )
 }

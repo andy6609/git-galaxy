@@ -9,6 +9,7 @@ import * as THREE from 'three'
 import { create } from 'zustand'
 import type { World } from '../data'
 import { mulberry32, requestedAppearance } from '../seed'
+import { useStore } from '../store'
 import { camZFor, cellPos, FOV, PlanetGrid, type Grid } from './Gallery'
 
 const STUDY = 6
@@ -122,6 +123,8 @@ function save(world: World, s: State) {
 }
 
 export function OatmealUI({ world }: { world: World }) {
+  const language = useStore((state) => state.language)
+  const ko = language === 'ko'
   const s = useOatmeal()
   const [record, setRecord] = useState<ReturnType<typeof save> | null>(null)
   const [size, setSize] = useState({ w: innerWidth, h: innerHeight })
@@ -183,24 +186,29 @@ export function OatmealUI({ world }: { world: World }) {
     <div className="oatmeal">
       {s.stage === 'intro' && (
         <div className="om-card">
-          <h1>오트밀 테스트</h1>
+          <h1>{ko ? '오트밀 테스트' : 'Oatmeal test'}</h1>
           <p>
-            행성 {STUDY}개를 하나씩 {STUDY_MS / 1000}초 동안 보여드립니다. 이름은 없습니다.
+            {ko
+              ? `행성 ${STUDY}개를 하나씩 ${STUDY_MS / 1000}초 동안 보여드립니다. 이름은 없습니다.`
+              : `You will see ${STUDY} unnamed planets, one at a time for ${STUDY_MS / 1000} seconds each.`}
           </p>
           <p>
-            그다음 <b>다른 각도</b>에서 본 행성 {OPTIONS}개 중 앞에서 본 것을 고르세요. {STUDY}문제입니다. 숫자
-            키(1–{OPTIONS})나 클릭으로 고릅니다.
+            {ko ? (
+              <>그다음 <b>다른 각도</b>에서 본 행성 {OPTIONS}개 중 앞에서 본 것을 고르세요. {STUDY}문제입니다. 숫자 키(1–{OPTIONS})나 클릭으로 고릅니다.</>
+            ) : (
+              <>Then identify it among {OPTIONS} planets shown from <b>another angle</b>. There are {STUDY} rounds. Click or press 1–{OPTIONS}.</>
+            )}
           </p>
           <button type="button" onClick={start}>
-            시작
+            {ko ? '시작' : 'Start'}
           </button>
-          {requestedAppearance() !== 2 && <p className="p-dim">외형 v{requestedAppearance()}</p>}
+          {requestedAppearance() !== 2 && <p className="p-dim">{ko ? '외형' : 'Appearance'} v{requestedAppearance()}</p>}
         </div>
       )}
       {s.stage === 'study' && (
         <div className="om-top">
           <span>
-            기억하세요 · {s.studyIdx + 1} / {STUDY}
+            {ko ? '기억하세요' : 'Remember this planet'} · {s.studyIdx + 1} / {STUDY}
           </span>
           <i key={s.studyIdx} className="om-bar" style={{ animationDuration: `${STUDY_MS}ms` }} />
         </div>
@@ -209,7 +217,7 @@ export function OatmealUI({ world }: { world: World }) {
         <>
           <div className="om-top">
             <span>
-              앞에서 본 행성은? · {s.trialIdx + 1} / {s.trials.length}
+              {ko ? '앞에서 본 행성은?' : 'Which planet did you see?'} · {s.trialIdx + 1} / {s.trials.length}
             </span>
           </div>
           {buttons.map((x, k) => (
@@ -219,7 +227,7 @@ export function OatmealUI({ world }: { world: World }) {
               className="om-pick"
               style={{ left: x - px * 1.1, width: px * 2.2, top: size.h / 2 - px * 1.1, height: px * 2.2 }}
               onClick={() => choose(k)}
-              aria-label={`${k + 1}번`}
+              aria-label={ko ? `${k + 1}번` : `Option ${k + 1}`}
             >
               <span>{k + 1}</span>
             </button>
@@ -229,17 +237,18 @@ export function OatmealUI({ world }: { world: World }) {
       {s.stage === 'done' && record && (
         <div className="om-card">
           <h1>
-            {record.score} {record.accuracy >= PASS ? '· 통과선 이상' : '· 통과선 아래'}
+            {record.score}{' '}
+            {record.accuracy >= PASS ? (ko ? '· 통과선 이상' : '· above threshold') : (ko ? '· 통과선 아래' : '· below threshold')}
           </h1>
           <p>
-            무작위 방해 {record.random} · 같은 원형 방해 {record.sameArch} · 통과선 {PASS * 100}%
+            {ko ? '무작위 방해' : 'Random distractors'} {record.random} · {ko ? '같은 원형 방해' : 'Same-archetype distractors'} {record.sameArch} · {ko ? '통과선' : 'threshold'} {PASS * 100}%
           </p>
           <pre>{JSON.stringify(record, null, 1)}</pre>
           <button type="button" onClick={() => navigator.clipboard?.writeText(JSON.stringify(record))}>
-            결과 복사
+            {ko ? '결과 복사' : 'Copy result'}
           </button>{' '}
           <button type="button" onClick={start}>
-            다시
+            {ko ? '다시' : 'Restart'}
           </button>
         </div>
       )}

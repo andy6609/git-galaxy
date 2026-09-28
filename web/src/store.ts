@@ -1,10 +1,12 @@
 // UI가 구독하는 상태. 프레임마다 바뀌는 값(카메라·호버 위치)은 여기 두지 않는다 (PLAN.md N-2).
 import { create } from 'zustand'
 import { fetchSystem, type Route, type SystemDetail, type World } from './data'
+import { initialLanguage, type Language } from './i18n'
 
 export type Phase = 'intro' | 'survey' | 'travel' | 'orbit'
 
 type State = {
+  language: Language
   world: World | null
   phase: Phase
   /** 현재 목적지 또는 궤도에 있는 행성 */
@@ -20,6 +22,7 @@ type State = {
 }
 
 export const useStore = create<State>(() => ({
+  language: initialLanguage(),
   world: null,
   phase: 'intro',
   focus: null,
@@ -32,6 +35,16 @@ export const useStore = create<State>(() => ({
 
 export const getState = useStore.getState
 export const setState = useStore.setState
+
+export function setLanguage(language: Language) {
+  try {
+    localStorage.setItem('gg-language', language)
+  } catch {
+    // The language still changes for this session when storage is unavailable.
+  }
+  document.documentElement.lang = language
+  setState({ language })
+}
 
 const inflight = new Set<string>()
 

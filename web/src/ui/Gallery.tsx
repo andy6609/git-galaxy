@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { World } from '../data'
+import { useStore } from '../store'
 import { ARCHETYPES, ARCHETYPE_LABEL, mulberry32, STYLES, STYLE_LABEL } from '../seed'
 import { landmarkRotation } from '../world/arrival'
 import { markDirty, writeInstance } from '../world/Planets'
@@ -101,6 +102,7 @@ export function PlanetGrid({
 }
 
 export function GalleryLabels({ world, indices, grid, pad = 0 }: { world: World; indices: number[]; grid: Grid; pad?: number }) {
+  const language = useStore((s) => s.language)
   const [h, setH] = useState(innerHeight)
   const [w, setW] = useState(innerWidth)
   useEffect(() => {
@@ -124,7 +126,7 @@ export function GalleryLabels({ world, indices, grid, pad = 0 }: { world: World;
             <span className="g-num">{k + 1}</span>
             {!hideNames && <span className="g-name">{p.n}</span>}
             <span className="g-arch">
-              {ARCHETYPE_LABEL[ARCHETYPES[look.arch]]} · {STYLE_LABEL[STYLES[look.style]]}
+              {ARCHETYPE_LABEL[language][ARCHETYPES[look.arch]]} · {STYLE_LABEL[language][STYLES[look.style]]}
             </span>
           </div>
         )

@@ -3,7 +3,8 @@
 // 배율에 따라 이름이 바뀐다: 우주 → 은하 이름, 은하 → 지역 이름, 가까이 → 행성계(계정) 이름, 궤도 → 항로와 이웃 행성
 import { useEffect, useRef } from 'react'
 import type { World } from '../data'
-import { getState, repoDetail, routesFor } from '../store'
+import { copyFor, type Language } from '../i18n'
+import { getState, repoDetail, routesFor, useStore } from '../store'
 import { projector } from './project'
 import { rt } from './runtime'
 import { starCore } from './Systems'
@@ -20,13 +21,14 @@ const LINE_H = 16
 
 const overlaps = (a: Rect, b: Rect) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
 
-function relation(world: World, focus: number | null, i: number) {
+function relation(world: World, focus: number | null, i: number, language: Language) {
   if (focus === null || focus === i) return null
   const f = world.planets[focus].n
   const { out, inc } = routesFor(world, focus)
-  if (out.some((x) => x.to === i)) return `${f}이(가) 딛고 선 곳`
-  if (inc.some((x) => x.to === i)) return `${f} 위에 선 곳`
-  if (world.planets[i].sys === world.planets[focus].sys) return `같은 행성계 · ${world.owner(i).login}`
+  const c = copyFor(language)
+  if (out.some((x) => x.to === i)) return c.supports(f)
+  if (inc.some((x) => x.to === i)) return c.supportedBy(f)
+  if (world.planets[i].sys === world.planets[focus].sys) return c.sameSystem(world.owner(i).login)
   return null
 }
 
@@ -43,6 +45,7 @@ class Layer {
   constructor(
     private root: HTMLDivElement,
     private world: World,
+    private language: Language,
   ) {
     for (let k = 0; k < POOL; k++) {
       const el = document.createElement('div')
@@ -240,13 +243,14 @@ class Layer {
         const d = repoDetail(world, rt.hover)
         if (d?.desc) line('hc-desc', d.desc)
         else line('hc-desc', [p.l, p.c?.slice(0, 4)].filter(Boolean).join(' · '))
-        const rel = relation(world, focus, rt.hover)
+        const rel = relation(world, focus, rt.hover, this.language)
         if (rel) line('hc-rel', rel)
       } else {
         const s = world.systems[rt.hoverStar]
-        line('hc-name', `${s.login}의 행성계`)
-        line('hc-desc', `행성 ${s.n}개${s.truncated ? '+' : ''} · ${world.galaxies[s.gal]?.name ?? '관계 미확정'}`)
-        line('hc-rel', `선택하면 @${s.login}의 행성계로 이동`)
+        const c = copyFor(this.language)
+        line('hc-name', c.systemOf(s.login))
+        line('hc-desc', `${c.planetCount(s.n, s.truncated)} · ${world.galaxies[s.gal]?.name ?? c.placementUnknown}`)
+        line('hc-rel', c.selectSystem(s.login))
       }
       this.cardFor = key
     }
@@ -265,13 +269,14 @@ class Layer {
 
 export function Overlay({ world }: { world: World }) {
   const root = useRef<HTMLDivElement>(null)
+  const language = useStore((s) => s.language)
   useEffect(() => {
-    const layer = new Layer(root.current!, world)
+    const layer = new Layer(root.current!, world, language)
     rt.drawOverlay = () => layer.draw()
     return () => {
       rt.drawOverlay = null
       layer.dispose()
     }
-  }, [world])
+  }, [world, language])
   return <div ref={root} className="overlay" aria-hidden />
 }

@@ -672,6 +672,29 @@ body {
 .info-panel a {
   color: var(--bone);
 }
+.language-switch {
+  position: fixed;
+  top: 20px;
+  right: 24px;
+  z-index: 5;
+  padding: 5px 8px;
+  font: 400 10.5px var(--sans);
+  color: var(--bone-dim);
+  background: rgba(10, 17, 20, 0.46);
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+}
+.language-switch:hover {
+  color: var(--bone);
+  border-bottom-color: var(--bone-dim);
+}
+.language-switch:focus-visible,
+.info-toggle:focus-visible {
+  outline: 2px solid var(--warm);
+  outline-offset: 2px;
+}
 .loading {
   position: fixed;
   inset: 0;
@@ -861,8 +884,12 @@ body {
   }
   .info {
     top: 64px;
-    right: 10px;
+    right: 78px;
     bottom: auto;
+  }
+  .language-switch {
+    top: 64px;
+    right: 10px;
   }
   .search {
     top: 12px;

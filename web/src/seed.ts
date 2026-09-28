@@ -37,31 +37,26 @@ export const ARCHETYPES = [
 ] as const
 export type Archetype = (typeof ARCHETYPES)[number]
 
-export const ARCHETYPE_LABEL: Record<Archetype, string> = {
-  basin: '거대 분지',
-  ring: '고리 협곡',
-  spire: '첨탑',
-  rift: '균열',
-  cliff: '반구 절벽',
-  terraces: '계단 고원',
-  twin: '쌍둥이 분지',
-  ridge: '적도 산맥',
-  spiral: '나선 홈',
-  mesas: '탁상 군도',
-  triple: '세 갈래 균열',
-  crown: '왕관',
-}
+export const ARCHETYPE_LABEL = {
+  en: {
+    basin: 'great basin', ring: 'ring canyon', spire: 'spire', rift: 'rift', cliff: 'hemisphere cliff',
+    terraces: 'stepped plateau', twin: 'twin basins', ridge: 'equatorial ridge', spiral: 'spiral groove',
+    mesas: 'mesa archipelago', triple: 'three-way rift', crown: 'crown',
+  },
+  ko: {
+    basin: '거대 분지', ring: '고리 협곡', spire: '첨탑', rift: '균열', cliff: '반구 절벽',
+    terraces: '계단 고원', twin: '쌍둥이 분지', ridge: '적도 산맥', spiral: '나선 홈',
+    mesas: '탁상 군도', triple: '세 갈래 균열', crown: '왕관',
+  },
+} satisfies Record<'en' | 'ko', Record<Archetype, string>>
 
 /** 무늬: 어느 각도에서 봐도 보이는 큰 명암 (E2) */
 export const STYLES = ['plain', 'twotone', 'bands', 'maria', 'polar'] as const
 export type Style = (typeof STYLES)[number]
-export const STYLE_LABEL: Record<Style, string> = {
-  plain: '무늬 없음',
-  twotone: '두 빛깔',
-  bands: '띠',
-  maria: '어두운 바다',
-  polar: '극관',
-}
+export const STYLE_LABEL = {
+  en: { plain: 'plain', twotone: 'two-tone', bands: 'bands', maria: 'dark maria', polar: 'polar cap' },
+  ko: { plain: '무늬 없음', twotone: '두 빛깔', bands: '띠', maria: '어두운 바다', polar: '극관' },
+} satisfies Record<'en' | 'ko', Record<Style, string>>
 
 /** [낮은 곳, 중간, 높은 곳, 강조] — PLAN.md K장 팔레트에서 파생 */
 export const PALETTES: [string, string, string, string][] = [

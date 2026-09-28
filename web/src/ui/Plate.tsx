@@ -3,6 +3,7 @@
 //   행성계 명판 행성계 전체를 볼 때: 계정 하나와 그 repo들 (만든 순서)
 import { useEffect, useState } from 'react'
 import type { World } from '../data'
+import { copyFor, type Language } from '../i18n'
 import { goToPlanet, showSystem } from '../nav'
 import { ARCHETYPES, ARCHETYPE_LABEL, PALETTES, STYLES, STYLE_LABEL } from '../seed'
 import { repoDetail, useStore } from '../store'
@@ -11,7 +12,12 @@ import { routesOf } from '../world/Lines'
 import { portraitIndices } from '../world/systemPortrait'
 
 const CHIPS = 8
-const ordinal = (k: number) => ['첫째', '둘째', '셋째', '넷째', '다섯째', '여섯째', '일곱째', '여덟째'][k] ?? `${k + 1}번째`
+const ordinal = (k: number, language: Language) => {
+  if (language === 'ko') return ['첫째', '둘째', '셋째', '넷째', '다섯째', '여섯째', '일곱째', '여덟째'][k] ?? `${k + 1}번째`
+  const n = k + 1
+  const suffix = n % 10 === 1 && n % 100 !== 11 ? 'st' : n % 10 === 2 && n % 100 !== 12 ? 'nd' : n % 10 === 3 && n % 100 !== 13 ? 'rd' : 'th'
+  return `${n}${suffix}`
+}
 const fmt = (n: number) => (n >= 10000 ? `${(n / 1000).toFixed(n >= 100000 ? 0 : 1)}k` : n.toLocaleString())
 
 async function copyText(value: string) {
@@ -54,12 +60,14 @@ function chip(world: World, i: number, label = world.planets[i].n) {
 }
 
 function NextDestinations({ world, current }: { world: World; current: number }) {
-  const destinations = nextSystems(world, current)
+  const language = useStore((s) => s.language)
+  const c = copyFor(language)
+  const destinations = nextSystems(world, current, 3, language)
   if (destinations.length === 0) return null
   return (
     <section className="next-section">
       <h2>
-        <i className="swatch s-next" /> 다음 항해 <span>{destinations.length}</span>
+        <i className="swatch s-next" /> {c.nextVoyage} <span>{destinations.length}</span>
       </h2>
       <ol className="next-systems">
         {destinations.map(({ system, reason }, order) => {
@@ -88,6 +96,8 @@ export function Plate({ world }: { world: World }) {
   const focus = useStore((s) => s.focus)
   const phase = useStore((s) => s.phase)
   const details = useStore((s) => s.details)
+  const language = useStore((s) => s.language)
+  const c = copyFor(language)
   const show = focus !== null && phase === 'orbit'
   if (focus === null || !world.planets[focus]) return <aside className="plate" />
 
@@ -99,9 +109,9 @@ export function Plate({ world }: { world: World }) {
   const stars = d?.stars ?? p.s
   const meta = [
     stars === null ? '★ —' : `★ ${fmt(stars)}`,
-    p.l ?? '언어 —',
-    p.c ? p.c.slice(0, 4) : '생성 —',
-    d ? (d.license ? d.license.toUpperCase() : '라이선스 미확인') : '…',
+    p.l ?? c.languageUnknown,
+    p.c ? p.c.slice(0, 4) : c.createdUnknown,
+    d ? (d.license ? d.license.toUpperCase() : c.licenseUnknown) : '…',
   ]
   const look = world.looks[focus]
   return (
@@ -115,26 +125,26 @@ export function Plate({ world }: { world: World }) {
       {sys && (
         <p className="p-meta p-place">
           <button type="button" onClick={() => showSystem(world, p.sys, 'system')}>
-            {sys.login}의 행성계
+            {c.systemOf(sys.login)}
           </button>
           <span>
             {' '}
-            · {ordinal(p.ring)} 궤도{p.c && ` · ${p.c} 생성`}
+            · {c.orbit(ordinal(p.ring, language))}{p.c && ` · ${c.created(p.c)}`}
           </span>
         </p>
       )}
       <p className="p-meta p-dim">
-        지형 · {ARCHETYPE_LABEL[ARCHETYPES[look.arch]]}
-        {look.style > 0 && ` · ${STYLE_LABEL[STYLES[look.style]]}`}
-        {d?.archived && ' · 보존된 세계 (archived)'}
-        {sys && ` · ${world.galaxies[sys.gal]?.name ?? '관계 미확정'}`}
-        {d && ` · 관측 ${(d.observed ?? '').slice(0, 10) || '—'}`}
+        {c.terrain} · {ARCHETYPE_LABEL[language][ARCHETYPES[look.arch]]}
+        {look.style > 0 && ` · ${STYLE_LABEL[language][STYLES[look.style]]}`}
+        {d?.archived && ` · ${c.archived}`}
+        {sys && ` · ${world.galaxies[sys.gal]?.name ?? c.placementUnknown}`}
+        {d && ` · ${c.observed} ${(d.observed ?? '').slice(0, 10) || '—'}`}
       </p>
       {out.length > 0 && (
         <section>
           <h2>
             <i className="swatch s-out" />
-            딛고 선 곳 <span>{out.length}</span>
+            {c.dependsOn} <span>{out.length}</span>
           </h2>
           <ul className="chips">
             {out.slice(0, CHIPS).map((r) => chip(world, r.to))}
@@ -145,7 +155,7 @@ export function Plate({ world }: { world: World }) {
       {inc.length > 0 && (
         <section>
           <h2>
-            <i className="swatch s-in" />이 위에 선 곳 <span>{inc.length + hiddenIncoming}</span>
+            <i className="swatch s-in" />{c.usedBy} <span>{inc.length + hiddenIncoming}</span>
           </h2>
           <ul className="chips">
             {inc.slice(0, CHIPS).map((r) => chip(world, r.to))}
@@ -154,11 +164,11 @@ export function Plate({ world }: { world: World }) {
         </section>
       )}
       {d && out.length === 0 && inc.length === 0 && (
-        <p className="p-note">관측한 행성들 사이에서 확인된 항로가 없습니다.</p>
+        <p className="p-note">{c.noRoutes}</p>
       )}
       <NextDestinations world={world} current={p.sys} />
       <a className="p-link" href={`https://github.com/${p.n}`} target="_blank" rel="noreferrer">
-        GitHub에서 보기 ↗
+        {c.viewGithub} ↗
       </a>
     </aside>
   )
@@ -169,6 +179,8 @@ export function SystemPlate({ world }: { world: World }) {
   const phase = useStore((s) => s.phase)
   const focus = useStore((s) => s.focus)
   const details = useStore((s) => s.details)
+  const language = useStore((s) => s.language)
+  const c = copyFor(language)
   const [showAll, setShowAll] = useState(false)
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle')
   useEffect(() => {
@@ -197,24 +209,24 @@ export function SystemPlate({ world }: { world: World }) {
   }
   return (
     <aside className={`plate system-plate ${show ? 'is-shown' : ''}`} aria-live="polite">
-      <p className="system-kicker">{s.kind === 'organization' ? '조직 행성계' : '나의 오픈소스 행성계'}</p>
+      <p className="system-kicker">{s.kind === 'organization' ? c.organizationSystem : c.personalSystem}</p>
       <h1 className="system-title">
         <span className="p-repo">@{s.login}</span>
       </h1>
       {d?.name && <p className="p-desc">{d.name}</p>}
       <p className="system-summary">
-        공개 저장소 <b>{s.n}개</b>{s.truncated ? ' 중 최근 100개를 관측했습니다.' : '로 만든 작은 우주입니다.'}
+        {c.publicRepos(s.n, s.truncated)}
       </p>
       <p className="p-meta p-dim">
         {topLangs.length > 0 && `${topLangs.join(' · ')} · `}
-        {first ? `${first.slice(0, 4)}년부터` : '생성 시점 미확인'}
+        {first ? c.since(first.slice(0, 4)) : c.createdTimeUnknown}
       </p>
       {s.gal >= 0 && s.reg < 0 && (
-        <p className="p-note">이 우주에 아직 비슷한 계정이 적어서, 가장 가까운 은하의 변두리에 자리 잡았습니다.</p>
+        <p className="p-note">{c.edgeNote}</p>
       )}
       <section className="hero-section">
         <h2>
-          지금 보이는 대표 행성 <span>{heroes.length}</span>
+          {c.featuredPlanets} <span>{heroes.length}</span>
         </h2>
         <ul className="hero-repos">
           {heroes.map((i) => {
@@ -231,7 +243,7 @@ export function SystemPlate({ world }: { world: World }) {
             )
           })}
         </ul>
-        {hidden > 0 && <p className="belt-note">나머지 {hidden}개 저장소는 바깥 벨트의 빛으로 남아 있습니다.</p>}
+        {hidden > 0 && <p className="belt-note">{c.beltNote(hidden)}</p>}
       </section>
       <NextDestinations world={world} current={k} />
       <div className="system-actions">
@@ -242,17 +254,17 @@ export function SystemPlate({ world }: { world: World }) {
           aria-live="polite"
         >
           {copyState === 'copied'
-            ? '주소를 복사했습니다'
+            ? c.copied
             : copyState === 'failed'
-              ? '복사하지 못했습니다'
-              : '이 행성계 공유하기'}
+              ? c.copyFailed
+              : c.shareSystem}
         </button>
         <a href={`https://github.com/${s.login}`} target="_blank" rel="noreferrer">
-          GitHub 보기
+          {c.viewGithubShort}
         </a>
       </div>
       <button type="button" className="all-repos-toggle" onClick={() => setShowAll((v) => !v)} aria-expanded={showAll}>
-        {showAll ? '전체 저장소 접기' : `저장소 ${members.length}개 모두 보기`}
+        {showAll ? c.collapseRepos : c.showRepos(members.length)}
       </button>
       {showAll && (
         <ul className="all-repos">

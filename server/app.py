@@ -100,7 +100,7 @@ def world():
             "placement_version": int(meta.get("placement_version", 0)),
             "generated_at": meta.get("generated_at"),
             "sources": json.loads(meta.get("sources", "[]")),
-            "data_license": "CC BY-SA 4.0 (ecosyste.ms 파생 데이터)",
+            "data_license": "CC BY-SA 4.0 (derived from ecosyste.ms data)",
             "stats": {"accounts": len(systems), "planets": len(repos), "edges": edges, "galaxies": len(galaxies),
                       "regions": len(regions), "radius": round(float(extent), 1)},
             "orbit": {"r0": I.U.ORBIT0, "gap": I.U.ORBIT_GAP},

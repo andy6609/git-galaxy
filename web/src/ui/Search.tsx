@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import { suggest, type World } from '../data'
+import { copyFor } from '../i18n'
 import { submitQuery } from '../nav'
 import { setState, useStore } from '../store'
 
@@ -7,10 +8,12 @@ export function Search({ world }: { world: World }) {
   const phase = useStore((s) => s.phase)
   const notFound = useStore((s) => s.notFound)
   const ingesting = useStore((s) => s.ingesting)
+  const language = useStore((s) => s.language)
+  const c = copyFor(language)
   const [q, setQ] = useState('')
   const [active, setActive] = useState(-1)
   const input = useRef<HTMLInputElement>(null)
-  const options = useMemo(() => suggest(world, q), [world, q])
+  const options = useMemo(() => suggest(world, q, 6, language), [world, q, language])
 
   const go = (value: string, via: 'search' | 'suggest') => {
     setQ('')
@@ -23,8 +26,8 @@ export function Search({ world }: { world: World }) {
     <div className={`search ${phase === 'intro' ? 'is-intro' : ''}`}>
       {phase === 'intro' && (
         <div className="intro-copy">
-          <h1>당신의 GitHub가 작은 우주가 됩니다.</h1>
-          <p>아이디만 입력하세요. 로그인 없이 공개 저장소로 행성계를 먼저 보여 드립니다.</p>
+          <h1>{c.heroTitle}</h1>
+          <p>{c.heroBody}</p>
         </div>
       )}
       <form
@@ -55,13 +58,13 @@ export function Search({ world }: { world: World }) {
               input.current?.blur()
             }
           }}
-          placeholder="username 또는 owner/repo"
-          aria-label="username, owner/repo, GitHub URL 또는 패키지 이름"
+          placeholder={c.placeholder}
+          aria-label={c.searchLabel}
           autoComplete="off"
           spellCheck={false}
         />
         <button type="submit" disabled={!q.trim()}>
-          {phase === 'intro' ? '내 행성계 만들기' : '찾기'}
+          {phase === 'intro' ? c.createSystem : c.find}
         </button>
       </form>
       {options.length > 0 && (
@@ -85,12 +88,12 @@ export function Search({ world }: { world: World }) {
       )}
       {ingesting && (
         <p className="notfound is-busy">
-          <b>{ingesting}</b>의 공개 저장소를 관측해 행성계를 만들고 있습니다. 그동안 우주를 둘러보셔도 됩니다.
+          {c.observing(ingesting)}
         </p>
       )}
       {notFound && !ingesting && (
         <p className="notfound">
-          <b>{notFound}</b> — 찾지 못했습니다. GitHub username이나 owner/repo를 확인해 주세요.
+          {c.notFound(notFound)}
         </p>
       )}
     </div>

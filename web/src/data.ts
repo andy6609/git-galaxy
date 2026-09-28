@@ -1,6 +1,7 @@
 // 서버(/api/world)에서 우주를 받아 인덱스를 만든다. 행성의 상세·항로는 행성계에 다가갈 때 받는다.
 //   은하 → 지역 → 행성계(계정) → 행성(repo) (DIRECTION D16)
 import * as THREE from 'three'
+import type { Language } from './i18n'
 import { lookFor, requestedAppearance, type Look } from './seed'
 import { arrivalFor } from './world/arrival'
 
@@ -293,13 +294,18 @@ export function resolveQuery(world: World, raw: string): Resolved {
 export type Suggestion = { label: string; sub: string; value: string }
 
 /** 확실하지 않을 때만 짧은 후보를 보여준다 (PLAN.md G) */
-export function suggest(world: World, raw: string, limit = 6): Suggestion[] {
+export function suggest(world: World, raw: string, limit = 6, language: Language = 'en'): Suggestion[] {
   const q = normalizeQuery(raw).toLowerCase()
   if (q.length < 2) return []
   if (resolveQuery(world, raw).kind !== 'none') return []
   const out: Suggestion[] = []
   for (const [login, k] of world.byLogin) {
-    if (login.startsWith(q) && out.length < 2) out.push({ label: world.systems[k].login, sub: `행성 ${world.systems[k].n}개`, value: login })
+    if (login.startsWith(q) && out.length < 2)
+      out.push({
+        label: world.systems[k].login,
+        sub: language === 'ko' ? `행성 ${world.systems[k].n}개` : `${world.systems[k].n} planets`,
+        value: login,
+      })
   }
   const scored: [number, number][] = []
   world.planets.forEach((p, i) => {

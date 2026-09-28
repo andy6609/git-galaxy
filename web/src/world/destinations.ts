@@ -1,4 +1,5 @@
 import type { World } from '../data'
+import { copyFor, type Language } from '../i18n'
 
 export type NextSystem = {
   system: number
@@ -29,9 +30,10 @@ function languageIndex(world: World) {
  * 다음 목적지는 실제로 관측한 값만 사용한다. dependency가 아닌 이웃을 dependency처럼
  * 말하지 않고, 언어·공간·규모 중 사용자가 이해할 수 있는 근거 하나를 붙인다.
  */
-export function nextSystems(world: World, current: number, limit = 3): NextSystem[] {
+export function nextSystems(world: World, current: number, limit = 3, language: Language = 'en'): NextSystem[] {
   const here = world.systems[current]
   if (!here) return []
+  const c = copyFor(language)
 
   const languages = languageIndex(world)
   const mine = new Set(languages[current] ?? [])
@@ -61,22 +63,22 @@ export function nextSystems(world: World, current: number, limit = 3): NextSyste
   if (near) {
     const region = near.sameRegion ? world.regions.find((r) => r.id === near.system.reg)?.name : null
     const galaxy = world.galaxies[near.system.gal]?.name
-    add(near, `${region ?? galaxy ?? '이 지역'}에서 가까운 이웃`)
+    add(near, c.nearbyReason(region ?? galaxy ?? c.thisRegion))
   }
 
   const shared = [...candidates]
     .filter((x) => x.shared && !used.has(x.k))
     .sort((a, b) => b.score - a.score || a.d2 - b.d2)[0]
-  if (shared) add(shared, `${shared.shared} 저장소를 함께 가진 이웃`)
+  if (shared) add(shared, c.sharedReason(shared.shared!))
 
   const small = [...candidates]
     .filter((x) => !used.has(x.k))
     .sort((a, b) => a.system.n - b.system.n || a.d2 - b.d2)[0]
-  if (small) add(small, `행성 ${small.system.n}개의 작은 행성계`)
+  if (small) add(small, c.smallReason(small.system.n))
 
   for (const candidate of [...candidates].sort((a, b) => b.score - a.score || a.d2 - b.d2)) {
     const galaxy = world.galaxies[candidate.system.gal]?.name
-    add(candidate, `${galaxy ?? '관계 미확정 지역'}의 다른 행성계`)
+    add(candidate, c.otherReason(galaxy ?? c.unmappedRegion))
   }
 
   return result

@@ -2,6 +2,7 @@
 // 이 브라우저가 모르는 계정은 서버에 묻고, 서버도 모르면 그 자리에서 들인다 (Git City처럼, DIRECTION D18).
 import * as THREE from 'three'
 import { ingest, loadWorld, normalizeQuery, resolveOnServer, resolveQuery, type World } from './data'
+import { copyFor } from './i18n'
 import { ensureDetail, getState, setState } from './store'
 import { logNav, rt, type NavVia } from './world/runtime'
 
@@ -26,7 +27,7 @@ export function goToPlanet(world: World, index: number, via: NavVia) {
   const dest = new THREE.Vector3(...p.pos)
   setState({ focus: index, system: null, phase: 'travel', notFound: null })
   navigationUrl(`?p=${encodeURIComponent(p.id)}`, via)
-  document.title = `${p.n} · Open-source Galaxy`
+  document.title = `${p.n} · Git Galaxy`
   ensureDetail(world, p.sys)
   logNav(via, p.n)
   rt.rig.flyTo(cam, {
@@ -49,7 +50,8 @@ export function showSystem(world: World, k: number, via: NavVia) {
   const s = world.systems[k]
   setState({ focus: null, system: k, phase: 'travel', notFound: null })
   navigationUrl(`?u=${encodeURIComponent(s.login)}`, via)
-  document.title = `@${s.login}의 행성계 · Open-source Galaxy`
+  const language = getState().language
+  document.title = `${copyFor(language).systemOf(`@${s.login}`)} · Git Galaxy`
   ensureDetail(world, k)
   logNav(via, `user:${s.login}`)
   // canonical 궤도는 장부에 유지하되, 계정의 첫 화면은 고정된 장난감 디오라마로 보여 준다 (D20).
@@ -75,7 +77,7 @@ export function showGalaxy(world: World) {
   if (!cam) return
   const radius = Math.max(...world.galaxies.map((g) => Math.hypot(g.c[0], g.c[2]) + g.r), 1000)
   setState({ focus: null, system: null, phase: 'travel', notFound: null })
-  document.title = 'Open-source Galaxy'
+  document.title = 'Git Galaxy'
   rt.rig.flyTo(cam, {
     dest: new THREE.Vector3(),
     arriveDir: new THREE.Vector3(0.34, 0.66, 0.67).normalize(),
@@ -100,7 +102,7 @@ export async function submitQuery(world: World, query: string, via: NavVia = 'se
   try {
     r = await resolveOnServer(q)
   } catch {
-    setState({ notFound: `${q} — 서버에 닿지 않습니다` })
+    setState({ notFound: q })
     return false
   }
   if (r.kind !== 'unknown') {
@@ -150,9 +152,9 @@ export async function submitQuery(world: World, query: string, via: NavVia = 'se
       if (k !== undefined) requestAnimationFrame(() => showSystem(fresh, k, via))
       return true
     }
-    setState({ ingesting: null, notFound: `${r.login} — ${res.message}` })
+    setState({ ingesting: null, notFound: r.login })
   } catch {
-    setState({ ingesting: null, notFound: `${r.login} — 지금은 가져올 수 없습니다` })
+    setState({ ingesting: null, notFound: r.login })
   }
   return false
 }
